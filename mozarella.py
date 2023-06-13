@@ -106,11 +106,6 @@ class Mozarella(QMainWindow):
         btn_root.triggered.connect(self.go_root)
         navtb.addAction(btn_root)
 
-        # кнопка для создания новой вкладки
-        new_tab_action = QAction(QIcon('toggle-expand.png'), 'New Tab', self)
-        new_tab_action.setStatusTip("Open New Tab")
-        new_tab_action.triggered.connect(lambda: self.add_new_tab())
-        navtb.addAction(new_tab_action)
         
         navtb.addSeparator()
 
