@@ -1,0 +1,180 @@
+# TODO: блокировка рекламы 
+# URL_adblock = "https://easylist.to/easylist/easylist.txt"
+
+from adblockparser import AdblockRules
+import os
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+# from PyQt5.QtWebKitWidgets import *
+from PyQt5.QtWebEngineWidgets import QWebEngineView as QWebView, QWebEnginePage as QWebPage, QWebEngineProfile as QWebProfile
+from PyQt5.QtWebEngineWidgets import QWebEngineSettings as QWebSettings
+from PyQt5.QtPrintSupport import *
+
+import re
+import sys
+
+# debug info
+# os.environ['QT_DEBUG_PLUGINS']='1'
+# os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--enable-gpu-command-logging"
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"]="--disable-gpu"
+
+
+
+
+class Mozarella(QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # основное окно
+        self.setWindowTitle("Mozarella")
+        self.setWindowIcon(QIcon('salad.png'))
+        self.browser = QWebView()
+        self.browser.setUrl(QUrl("about:blank"))             # страница по дефолту
+
+############### SETTINGS 
+        self.browser.page().settings().setAttribute(QWebSettings.AllowGeolocationOnInsecureOrigins, False)
+        # self.browser.page().settings().setAttribute(QWebSettings.AutoLoadImages, False)
+        # self.browser.page().settings().setAttribute(QWebSettings.JavascriptEnabled, False)
+
+
+################### КНОПОЧКИ И ТУЛБАР
+        navtb = QToolBar("Navigation")
+        navtb.setIconSize(QSize(20,20))
+        navtb.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.addToolBar(navtb)
+
+        btn_back = QAction(QIcon('back.png'), 'Back', self)            # <==
+        btn_back.triggered.connect(self.browser.back)
+        btn_back.setShortcut(QKeySequence('Backspace'))                # горячая клавиша
+        navtb.addAction(btn_back)
+
+        btn_forward = QAction(QIcon('forward.png'), 'Forward', self)    # ==>
+        btn_forward.triggered.connect(self.browser.forward)
+        navtb.addAction(btn_forward)
+
+        btn_root = QAction(QIcon('root.png'), 'Back', self)          # ROOT
+        btn_root.triggered.connect(self.go_root)
+        navtb.addAction(btn_root)
+
+        navtb.addSeparator()
+
+        self.entry_url = QLineEdit()                                   # URL
+        self.browser.urlChanged.connect(self.update_entry_url)         # действия при изменении url
+        self.entry_url.editingFinished.connect(self.open_url)          # если редактирование адресной строки закончено
+        # self.entry_url.returnPressed.connect(self.open_url)          # если нажат Enter в адресной строке
+        navtb.addWidget(self.entry_url)
+
+        navtb.addSeparator()
+
+    
+############ МЕНЮ НАСТРОЕК 
+        menu_settings = QPushButton("", self)
+        menu_settings.setIcon(QIcon("wrench.png"))
+        navtb.addWidget(menu_settings)
+        menu = QMenu()
+        menu_settings.setMenu(menu)
+
+        self.btn_image = QAction(QIcon("red.png"), "Disable load images", self)
+        self.btn_image.setCheckable(True)
+        self.btn_image.triggered.connect(self.disable_images)
+        menu.addAction(self.btn_image)
+
+        self.btn_adblock = QAction(QIcon('red.png'), 'TurnOn Adblock', self)            # RUN ADBLOCK
+        self.btn_adblock.setCheckable(True)
+        self.btn_adblock.triggered.connect(self.turnon_adblock)
+        menu.addAction(self.btn_adblock)
+
+        self.btn_print = QAction(QIcon('printer.png'), "Save Page to pdf file", self)
+        self.btn_print.triggered.connect(self.print)
+        menu.addAction(self.btn_print)
+        
+        self.setCentralWidget(self.browser)
+
+
+    def disable_images(self, a):
+        print("Disable Images:", a)
+        ''' Отключает автоматическую загрузку изображений с сайтов '''
+        if a:
+            self.btn_image.setIcon(QIcon("green.png"))
+            self.browser.page().settings().setAttribute(QWebSettings.AutoLoadImages, False)
+        else:
+            self.btn_image.setIcon(QIcon("red.png"))
+            self.browser.page().settings().setAttribute(QWebSettings.AutoLoadImages, True)
+
+
+    def turnon_adblock(self, status):
+        print("Adblock: ", status)
+        """ Скачивает фильтр рекламы, передаёт его Adblock_Rules и вызывает класс WebEngineUrlRequestInterceptor """
+        if status:
+            self.btn_adblock.setIcon(QIcon("green.png"))
+        else:
+            self.btn_adblock.setIcon(QIcon("red.png"))
+
+    def go_root(self):
+        ''' Для кнопки перехода в корень сайта '''
+        url = self.entry_url.text()
+        slash_object = re.finditer(pattern='/', string = url)
+        indexes = [index.start() for index in slash_object]
+        if len(indexes) >= 3:
+            url = url[:indexes[2]]
+        self.browser.setUrl(QUrl(url))                             # переход по url
+
+
+    def update_entry_url(self, q):
+        ''' Обновляет адресную строку на текущее местоположение '''
+        self.entry_url.setText(q.toString())
+        self.entry_url.setCursorPosition(0)                # позиция курсора после обновления адресной строки
+
+
+    def open_url(self):
+        ''' отрабатывает при нажатии Enter в адресной строке '''
+        url = self.entry_url.text()
+        if "http://" not in url and "https://" not in url:
+            url = "http://" + url
+        self.browser.setUrl(QUrl(url))                             # переход по url
+
+    def print(self):
+        """ Открывает диалоговое окно для выбора куда сохранить файл и сохраняет страницу в pdf """
+        name = QFileDialog.getSaveFileName(self, 'Save File', "page", "PDF files (*.pdf)")
+        self.browser.page().printToPdf(f"{name[0]}.pdf")
+
+
+
+
+app = QApplication(sys.argv)
+window = Mozarella()
+window.show()
+# sys.argv.append('--disable-web-security --disable-webgl --disable-webgl2')
+app.exec_()
+
+
+
+                    ##Setting the user agent of the browser.
+        #chrome = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.7113.93 Safari/537.36"
+        #edge = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4482.0 Safari/537.36 Edg/92.0.874.0"
+        #firefox = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0"
+        #brave = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.38 Safari/537.36 Brave/75"
+        #safari = "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Safari/605.1.15"
+        #chromium = "Mozilla/5.0 (X11; GNU/Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chromium/88.0.4324.150 Chrome/88.0.4324.150 Safari/537.36 Tesla/DEV-BUILD-4d1a3f465b3a"
+
+        #user_agent_string = safari
+
+        #self.browser.page().profile().setHttpUserAgent(
+            #user_agent_string
+        #)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
