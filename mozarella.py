@@ -1,13 +1,52 @@
-#!/usr/bin/python3.10
+#!/usr/bin/python3.11
 # TODO: блокировка рекламы 
 # URL_adblock = "https://easylist.to/easylist/easylist.txt"
+help_text = r"""
 
+█▄─▀█▀─▄██─▄▄─██░▄▄░▄███▀▄─███▄─▄▄▀██▄─▄▄─██▄─▄████▄─▄█████▀▄─██
+██─█▄█─███─██─███▀▄█▀███─▀─████─▄─▄███─▄█▀███─██▀███─██▀███─▀─██
+▀▄▄▄▀▄▄▄▀▀▄▄▄▄▀▀▄▄▄▄▄▀▀▄▄▀▄▄▀▀▄▄▀▄▄▀▀▄▄▄▄▄▀▀▄▄▄▄▄▀▀▄▄▄▄▄▀▀▄▄▀▄▄▀
+                           BROWSER
+
+                          ∙∙∙∙∙·▫▫ᵒᴼᵒ▫ₒₒ▫ᵒᴼᵒ▫ₒₒ▫ᵒᴼᵒ☼)===> About:
+
+This is a test browser created for my own needs. 
+It can:
+  ● work with tabs;
+  ● block ads from easylist, which is downloaded automatically;
+  ● disable javascript from pages;
+  ● disable images from pages;
+  ● use tor for loading pages;
+
+It can't:
+  ● store your passwords
+  ● remember your history
+  ● add pages to favorites
+         ... and much more
+  
+                    ∙∙∙∙∙·▫▫ᵒᴼᵒ▫ₒₒ▫ᵒᴼᵒ▫ₒₒ▫ᵒᴼᵒ☼)===> For use tor:
+
+  ● download fresh tor from https://www.torproject.org/download/
+  ● put all tor files in mozarella\tor folder and create torrc.
+       example:
+            SOCKSPort 9052
+            GeoIPFile geoip
+            GeoIPv6File geoip6
+            CookieAuthentication 1
+
+  ● run browser from command line:
+            python mozarella.py -tor
+                    or 
+            mozarella.exe -tor
+
+"""
 
 from adblockparser import AdblockRules
 import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+from PyQt5.QtNetwork import QNetworkProxy
 # from PyQt5.QtWebKitWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineView as QWebView, QWebEnginePage as QWebPage, QWebEngineProfile as QWebProfile
 from PyQt5.QtWebEngineWidgets import QWebEngineSettings as QWebSettings
@@ -21,6 +60,7 @@ import sys
 # for download files
 import requests
 import shutil
+
 
 
 # debug info
@@ -78,7 +118,7 @@ class Mozarella(QMainWindow):
         self.tabs.currentChanged.connect(self.current_tab_changed)        # изменение строки url при смене закладки
         self.tabs.setTabsClosable(True)                                   # включить возможность закрывать вкладки 
         self.tabs.tabCloseRequested.connect(self.current_tab_close)       # метод, которым вкладки будут закрываться 
-
+        self.tor = False                                                  # tor по умолчанию выключен
 
 
 
@@ -144,6 +184,7 @@ class Mozarella(QMainWindow):
         menu.addAction(self.btn_print)
         
         self.setCentralWidget(self.tabs)      # главный виджет
+
 
 
     def doubleclick_addtab(self, i):
@@ -257,14 +298,21 @@ class Mozarella(QMainWindow):
         """ Скачивает фильтр рекламы, передаёт его Adblock_Rules и вызывает класс WebEngineUrlRequestInterceptor """
         if status:
             ''' загружаем правила '''
-            with open("easylist.txt") as f:
-                raw_rules = f.readlines()
-                globals()['rules'] = AdblockRules(raw_rules)
+            s = requests.get('https://easylist.to/easylist/easylist.txt')
+            """ сохраняем в файл """
+            with open("easylist.txt", "wb") as f:
+                f.write(s.content)
+
+            """ читаем из файла в кодировке utf-8 """
+            raw_rules = open("easylist.txt", encoding='utf-8', errors='ignore')
+            
+            # скармливаем правила библиотеке adblock
+            globals()['rules'] = AdblockRules(raw_rules)
             self.btn_adblock.setIcon(QIcon("green.png"))      # меняем иконку на зелёную
             QtWebEngineWidgets.QWebEngineProfile.defaultProfile().setRequestInterceptor(interceptor)   # включаем профиль
         else:
 
-            with open("nothing.txt") as f:
+            with open("nothing.txt", "w") as f:           # пустой файл в качестве настроек adblock
                 raw_rules = f.readlines()
                 globals()['rules'] = AdblockRules(raw_rules)
             self.btn_adblock.setIcon(QIcon("red.png"))
@@ -299,12 +347,26 @@ class Mozarella(QMainWindow):
     def print(self):
         """ Открывает диалоговое окно для выбора куда сохранить файл и сохраняет страницу в pdf """
         name = QFileDialog.getSaveFileName(self, 'Save File', "page", "PDF files (*.pdf)")
-        self.tabs.currentWidget().page().printToPdf(f"{name[0]}.pdf")
+        self.tabs.currentWidget().page().printToPdf(f"{name[0]}")
+
+
 
 
 
 
 app = QApplication(sys.argv)
+if len(sys.argv) > 1:
+    if sys.argv[1] in ("-tor", "tor", "--tor", "/tor"):
+        tor_path = os.path.join("tor", "tor.exe")
+        torrc_path = os.path.join("tor", "torrc")
+        os.system(f"start cmd /c {tor_path} -f {torrc_path}")
+        networkProxy = QNetworkProxy(QNetworkProxy.Socks5Proxy, "127.0.0.1", 9052)
+        QNetworkProxy.setApplicationProxy(networkProxy)
+    elif sys.argv[1] in ("help", "-help", "--help", "-?", "/?", "--?"):
+        print(help_text)
+        quit()
+
+print(sys.argv)
 window = Mozarella()
 window.show()
 # sys.argv.append('--disable-web-security --disable-webgl --disable-webgl2')
