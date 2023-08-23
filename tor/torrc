@@ -1,0 +1,5 @@
+
+SOCKSPort 9052
+GeoIPFile geoip
+GeoIPv6File geoip6
+CookieAuthentication 1

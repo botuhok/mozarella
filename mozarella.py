@@ -352,17 +352,25 @@ class Mozarella(QMainWindow):
 
 
 
-
+def call_tor():
+    os.system(f'xterm -e bash -c "tor -f {torrc_path}"')
 
 app = QApplication(sys.argv)
 if len(sys.argv) > 1:
     if sys.argv[1] in ("-tor", "tor", "--tor", "/tor"):
-        tor_path = os.path.join("tor", "tor.exe")
-        torrc_path = os.path.join("tor", "torrc")
-        os.system(f"start cmd /c {tor_path} -f {torrc_path}")
+        if os.name == 'posix':
+            torrc_path = os.path.join("tor", "torrc")
+            import multiprocessing
+            p = multiprocessing.Process(target=call_tor)
+            p.start()
+
+        else:
+            tor_path = os.path.join("tor", "tor.exe")
+            torrc_path = os.path.join("tor", "torrc")
+            os.system(f"start cmd /c {tor_path} -f {torrc_path}")
         networkProxy = QNetworkProxy(QNetworkProxy.Socks5Proxy, "127.0.0.1", 9052)
         QNetworkProxy.setApplicationProxy(networkProxy)
-    elif sys.argv[1] in ("help", "-help", "--help", "-?", "/?", "--?"):
+    elif sys.argv[1] in ("-h", "--h", "help", "-help", "--help", "-?", "/?", "--?"):
         print(help_text)
         quit()
 
