@@ -42,6 +42,7 @@ It can't:
 """
 
 from adblockparser import AdblockRules
+import multiprocessing
 import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -52,15 +53,10 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView as QWebView, QWebEnginePage 
 from PyQt5.QtWebEngineWidgets import QWebEngineSettings as QWebSettings
 from PyQt5 import QtWebEngineCore, QtWebEngineWidgets
 from PyQt5.QtPrintSupport import *
-
 import re
-import sys
-
-
-# for download files
 import requests
 import shutil
-
+import sys
 
 
 # debug info
@@ -79,7 +75,7 @@ class WebEngineUrlRequestInterceptor(QtWebEngineCore.QWebEngineUrlRequestInterce
     def interceptRequest(self, info):
         url = info.requestUrl().toString()
         if rules.should_block(url):
-            print("Заблокировано ::::::::::::::::::::::", url)
+            print("BLOCKED AD ::::::::::::::::::::::", url)
             info.block(True)
 
 
@@ -106,10 +102,6 @@ class Mozarella(QMainWindow):
 
 
 ############### ВКЛАДКИ 
-        # Определять геолокацию == False
-        # self.tabs.currentWidget().page().settings().setAttribute(QWebSettings.AutoLoadImages, False)
-        # self.tabs.currentWidget().page().settings().setAttribute(QWebSettings.JavascriptEnabled, False)
-        #self.tabs.currentWidget() == browser объект внутри вкладки
     
         self.tabs = QTabWidget()                                          # виджет с вкладками
         self.tabs.setDocumentMode(True)                                   # внешний вид вкладок
@@ -290,9 +282,6 @@ class Mozarella(QMainWindow):
             self.btn_java.setIcon(QIcon("red.png"))
             self.tabs.currentWidget().page().settings().setAttribute(QWebSettings.JavascriptEnabled, True)
 
-
-
-
     def turnon_adblock(self, status):
         print("Adblock: ", status)
         """ Скачивает фильтр рекламы, передаёт его Adblock_Rules и вызывает класс WebEngineUrlRequestInterceptor """
@@ -358,12 +347,12 @@ def call_tor():
 app = QApplication(sys.argv)
 if len(sys.argv) > 1:
     if sys.argv[1] in ("-tor", "tor", "--tor", "/tor"):
+        # запуск отдельного процесса тор, если ОС = линукс
         if os.name == 'posix':
             torrc_path = os.path.join("tor", "torrc")
-            import multiprocessing
             p = multiprocessing.Process(target=call_tor)
             p.start()
-
+        # запуск отдельного окна с тор, если ОС = windows
         else:
             tor_path = os.path.join("tor", "tor.exe")
             torrc_path = os.path.join("tor", "torrc")
